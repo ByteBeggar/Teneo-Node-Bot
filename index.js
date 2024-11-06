@@ -1,18 +1,16 @@
 const axios = require('axios');
-const chalk = require('chalk');
 const WebSocket = require('ws');
 const { HttpsProxyAgent } = require('https-proxy-agent');
-const readline = require('readline');
 const accounts = require('./account.js');
 const proxies = require('./proxy.js');
 const { useProxy } = require('./config.js');
+const blessed = require('blessed');
+const contrib = require('blessed-contrib');
 
-// Parse accounts to extract email and password
 const parsedAccounts = accounts.map(account => {
   const [email, password] = account.split(',');
   return { email, password };
 });
-
 
 let sockets = [];
 let pingIntervals = [];
@@ -20,7 +18,7 @@ let countdownIntervals = [];
 let potentialPoints = [];
 let countdowns = [];
 let pointsTotals = [];
-let pointsToday = [];
+let pointsTodayArray = [];
 let lastUpdateds = [];
 let messages = [];
 let userIds = [];
@@ -28,47 +26,103 @@ let userIds = [];
 const authorization = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlra25uZ3JneHV4Z2pocGxicGV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjU0MzgxNTAsImV4cCI6MjA0MTAxNDE1MH0.DRAvf8nH1ojnJBc3rD_Nw6t1AV8X_g6gmY_HByG2Mag";
 const apikey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlra25uZ3JneHV4Z2pocGxicGV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjU0MzgxNTAsImV4cCI6MjA0MTAxNDE1MH0.DRAvf8nH1ojnJBc3rD_Nw6t1AV8X_g6gmY_HByG2Mag";
 
-function displayHeader() {
-  console.log("");
-  console.log(chalk.yellow(" ============================================"));
-  console.log(chalk.yellow("|                 Teneo Bot                  |"));
-  console.log(chalk.yellow("|         github.com/ByteBeggar              |"));
-  console.log(chalk.yellow(" ============================================"));
-  console.log(""); // Empty line for spacing
+const screen = blessed.screen({
+  smartCSR: true,
+  title: 'Teneo Bot Dashboard'
+});
+
+const table = contrib.table({
+  keys: true,
+  fg: 'white',
+  selectedFg: 'white',
+  selectedBg: 'blue',
+  interactive: false,
+  label: 'Account Status',
+  width: '100%',
+  height: '90%',
+  border: { type: "line", fg: "cyan" },
+  columnSpacing: 1,
+  columnWidth: [10, 25, 15, 15, 20, 30]
+});
+
+screen.append(table);
+
+const log = contrib.log({
+  fg: "green",
+  selectedFg: "green",
+  label: 'Logs',
+  height: '10%',
+  width: '100%',
+  top: '90%'
+});
+
+screen.append(log);
+
+function customLog(message) {
+  log.log(message);
+  screen.render();
 }
 
-function displayAccountData(index) {
-  console.log(chalk.cyan(`============= Account ${index + 1} =============`));
-  console.log(chalk.whiteBright(`📧 Email: ${parsedAccounts[index].email}`));
-  console.log(chalk.white(`🆔 User ID: ${userIds[index]}`));
-  console.log(chalk.green(`💰 Points Total: ${pointsTotals[index] || 0}`));
-  console.log(chalk.green(`📅 Points Today: ${pointsToday[index] || 0}`));
-  console.log(chalk.whiteBright(`💬 Message: ${messages[index] || "No message"}`));
-  
-  const proxy = proxies[index];
-  if (useProxy && proxy) {
-    console.log(chalk.hex('#FFA500')(`🌐 Proxy: ${proxy}`));
-  } else {
-    console.log(chalk.red('🔌 No Proxy'));
+
+const pageSize = 20;  
+let currentPage = 0;
+const pageInfo = blessed.text({
+  bottom: 0,
+  left: 'center',
+  content: `Page ${currentPage + 1} - Use UP/DOWN arrow keys to navigate pages`,
+  style: {
+    fg: 'white',
+    bg: 'black'
+  }
+});
+
+screen.append(pageInfo);
+function updateTable() {
+  const data = {
+    headers: ['Account', 'Email', 'Points Total', 'Points Today', 'Status', 'Proxy'],
+    data: []
+  };
+
+  const start = currentPage * pageSize;
+  const end = Math.min(start + pageSize, accounts.length);
+
+  for (let i = start; i < end; i++) {
+    const email = parsedAccounts[i].email;
+    const pointsTotal = pointsTotals[i] || 0;
+    const pointsToday = pointsTodayArray[i] || 0;
+    const status = countdowns[i] || "Calculating...";
+    const proxy = (useProxy && proxies[i % proxies.length]) ? `✔ ${proxies[i % proxies.length]}` : "No Proxy";
+    data.data.push([
+      String(i + 1),
+      email,
+      String(pointsTotal),
+      String(pointsToday),
+      status,
+      proxy
+    ]);
   }
 
-  console.log(chalk.cyan("=========================================="));
+  table.setData(data);
+  screen.render();
 }
 
-
-
-
-function logAllAccounts() {
-  console.clear();
-  displayHeader();
-  for (let i = 0; i < accounts.length; i++) {
-    displayAccountData(i);
+screen.key(['up', 'down'], (ch, key) => {
+  if (key.name === 'up' && currentPage > 0) {
+    currentPage--;  
+  } else if (key.name === 'down' && (currentPage + 1) * pageSize < accounts.length) {
+    currentPage++;  
   }
-  console.log("\nStatus:");
-  for (let i = 0; i < accounts.length; i++) {
-    console.log(`Account ${i + 1}: Potential Points: ${potentialPoints[i]}, Countdown: ${countdowns[i]}`);
-  }
-}
+  updateTable();  
+});
+
+updateTable();
+
+
+setInterval(updateTable, 5000);
+
+screen.key(['escape', 'q', 'C-c'], function(ch, key) {
+  process.exit(0);
+});
 
 async function connectWebSocket(index) {
   if (sockets[index]) return;
@@ -76,46 +130,47 @@ async function connectWebSocket(index) {
   const url = "wss://secure.ws.teneo.pro";
   const wsUrl = `${url}/websocket?userId=${encodeURIComponent(userIds[index])}&version=${encodeURIComponent(version)}`;
 
-  const proxy = proxies[index % proxies.length];
-  const agent = useProxy ? new HttpsProxyAgent(`http://${proxy.username}:${proxy.password}@${proxy.host}:${proxy.port}`) : null;
+  let agent = null;
+  if (useProxy && proxies.length > 0) {
+    const proxyUrl = proxies[index % proxies.length];
+    agent = new HttpsProxyAgent(proxyUrl);
+  }
 
   sockets[index] = new WebSocket(wsUrl, { agent });
 
   sockets[index].onopen = async () => {
     lastUpdateds[index] = new Date().toISOString();
-    console.log(`Account ${index + 1} Connected`, lastUpdateds[index]);
+    customLog(`Account ${index + 1} Connected at ${lastUpdateds[index]}`);
     startPinging(index);
     startCountdownAndPoints(index);
   };
 
   sockets[index].onmessage = async (event) => {
-  const data = JSON.parse(event.data);
-  if (data.pointsTotal !== undefined && data.pointsToday !== undefined) {
-    lastUpdateds[index] = new Date().toISOString();
-    pointsTotals[index] = data.pointsTotal; // Update points total
-    pointsToday[index] = data.pointsToday;  // Update points today
-    messages[index] = data.message || "No new message";
+    const data = JSON.parse(event.data);
+    if (data.pointsTotal !== undefined && data.pointsToday !== undefined) {
+      lastUpdateds[index] = new Date().toISOString();
+      pointsTotals[index] = data.pointsTotal;
+      pointsTodayArray[index] = data.pointsToday;
+      messages[index] = data.message || "No new message";
+      updateTable();
+    }
 
-    logAllAccounts(); // Refresh account display with updated points
-  }
-
-  if (data.message === "Pulse from server") {
-    console.log(`Pulse from server received for Account ${index + 1}. Start pinging...`);
-    setTimeout(() => {
-      startPinging(index)
-    }, 10000);
-  }
-};
-
+    if (data.message === "Pulse from server") {
+      customLog(`Pulse from server received for Account ${index + 1}. Start pinging...`);
+      setTimeout(() => {
+        startPinging(index);
+      }, 10000);
+    }
+  };
 
   sockets[index].onclose = () => {
     sockets[index] = null;
-    console.log(`Account ${index + 1} Disconnected`);
+    customLog(`Account ${index + 1} Disconnected`);
     restartAccountProcess(index);
   };
 
   sockets[index].onerror = (error) => {
-    console.error(`WebSocket error for Account ${index + 1}:`, error);
+    customLog(`WebSocket error for Account ${index + 1}: ${error.message}`);
   };
 }
 
@@ -130,11 +185,13 @@ function disconnectWebSocket(index) {
 function startPinging(index) {
   pingIntervals[index] = setInterval(async () => {
     if (sockets[index] && sockets[index].readyState === WebSocket.OPEN) {
-      const proxy = proxies[index % proxies.length];
-      const agent = useProxy ? new HttpsProxyAgent(`http://${proxy.username}:${proxy.password}@${proxy.host}:${proxy.port}`) : null;
-      
+      let agent = null;
+      if (useProxy && proxies.length > 0) {
+        const proxyUrl = proxies[index % proxies.length];
+        agent = new HttpsProxyAgent(proxyUrl);
+      }
+
       sockets[index].send(JSON.stringify({ type: "PING" }), { agent });
-      logAllAccounts();
     }
   }, 10000);
 }
@@ -147,7 +204,7 @@ function stopPinging(index) {
 }
 
 process.on('SIGINT', () => {
-  console.log('Stopping...');
+  customLog('Stopping...');
   for (let i = 0; i < accounts.length; i++) {
     stopPinging(i);
     disconnectWebSocket(i);
@@ -213,23 +270,23 @@ async function updateCountdownAndPoints(index) {
     lastUpdateds[index].calculatingTime = now;
   }
 
-  logAllAccounts();
+  updateTable();
 }
 
 function restartAccountProcess(index) {
   disconnectWebSocket(index);
   connectWebSocket(index);
-  console.log(`WebSocket restarted for index: ${index}`);
+  customLog(`WebSocket restarted for index: ${index}`);
 }
 
 async function getUserId(index) {
   const loginUrl = "https://ikknngrgxuxgjhplbpey.supabase.co/auth/v1/token?grant_type=password";
-  const proxy = proxies[index];
-  const agent = useProxy && proxy ? new HttpsProxyAgent(proxy) : null;
+  let agent = null;
+  if (useProxy && proxies.length > 0) {
+    const proxyUrl = proxies[index % proxies.length];
+    agent = new HttpsProxyAgent(proxyUrl);
+  }
 
-  // Debugging line: Ensure email and password are being correctly parsed
-  console.log(`Attempting to login with Email: ${parsedAccounts[index].email}, Password: ${parsedAccounts[index].password}`);
-  
   try {
     const response = await axios.post(loginUrl, {
       email: parsedAccounts[index].email,
@@ -243,25 +300,22 @@ async function getUserId(index) {
     });
 
     userIds[index] = response.data.user.id;
-    logAllAccounts();
 
     startCountdownAndPoints(index);
     await connectWebSocket(index);
   } catch (error) {
-    console.error(`Error for Account ${index + 1}:`, error.response ? error.response.data : error.message);
+    customLog(`Error for Account ${index + 1}: ${error.response ? error.response.data : error.message}`);
   }
 }
-
-
-
-displayHeader();
 
 for (let i = 0; i < accounts.length; i++) {
   potentialPoints[i] = 0;
   countdowns[i] = "Calculating...";
-    pointsToday[i] = 0;
-    lastUpdateds[i] = null;
-    messages[i] = '';
-    userIds[i] = null;
-    getUserId(i);
+  pointsTodayArray[i] = 0;
+  lastUpdateds[i] = null;
+  messages[i] = '';
+  userIds[i] = null;
+  getUserId(i);
 }
+
+updateTable();
