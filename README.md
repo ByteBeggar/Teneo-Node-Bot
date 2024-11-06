@@ -26,17 +26,17 @@ Teneo bot is a simple tool designed to automate the node interaction.
 
 ## Usage
 
-1. Set the `account.js`, `config.js` and `proxy.js` before running the script. Below how to setup this fie.
-2. Configuration:
-	Modify the `account.js` file to set your account parameters
-	```
-	module.exports = [
-    "name1@gmail.com,123456",
-	"name2@gmail.com,123456",
-	"name3@gmail.com,123456"
-      
-    // Add more accounts
-    ];
+1. Set the `account.js`, `config.js`, and `proxy.js` before running the script. Below is how to set up these files.
+
+2. **Configuration**: Modify the `account.js` file to set your account parameters
+   ```javascript
+   module.exports = [
+       "name1@gmail.com,123456",
+       "name2@gmail.com,123456",
+       "name3@gmail.com,123456"
+       // Add more accounts
+   ];
+
 	```
 	Modify the `config.js` file if you want to use proxy or not, default is false (not use proxy)
 	```
@@ -49,13 +49,11 @@ Teneo bot is a simple tool designed to automate the node interaction.
 	Modify and set the `proxy.js` file if you want to use proxy
 	```
 	module.exports = [
-        "http://proxyHost:proxyPort",
-	"http://proxyHost:proxyPort",
-	"http://proxyHost:proxyPort"
-  
-     // Add more proxies
-    ];
-
+    "http://proxyHost:proxyPort",
+    "http://proxyHost:proxyPort",
+    "http://proxyHost:proxyPort"
+    // Add more proxies
+];
 	```
 3. Run the script:
 	```bash
