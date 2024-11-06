@@ -53,12 +53,13 @@ Teneo bot is a simple tool designed to automate the node interaction.
     "http://proxyHost:proxyPort",
     "http://proxyHost:proxyPort"
     // Add more proxies
-];
-	```
+    ];
+    
+     ```
 3. Run the script:
-	```bash
-	node index.js
-	```
+```bash
+node index.js
+```
 
 
 ## Note
