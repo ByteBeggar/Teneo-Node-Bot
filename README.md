@@ -49,9 +49,9 @@ Teneo bot is a simple tool designed to automate the node interaction.
 	Modify and set the `proxy.js` file if you want to use proxy
 	```
 	module.exports = [
-  "http://192.168.100.1:1000",
-	"http://192.168.100.1:1001",
-	"http://192.168.100.1:1002"
+        "http://proxyHost:proxyPort",
+	"http://proxyHost:proxyPort",
+	"http://proxyHost:proxyPort"
   
      // Add more proxies
     ];
